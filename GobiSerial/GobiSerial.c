@@ -296,7 +296,7 @@ static int GobiProbe(
             DBG( "Could not set interface, error %d\n", nRetval );
          }
       }
-      else if (nInterfaceNum == 3)
+      else if (nInterfaceNum == 3 || nInterfaceNum == 8 || nInterfaceNum == 9)
       {
          DBG( "GPS port found\n" );
          nRetval = usb_set_interface( pSerial->dev,
