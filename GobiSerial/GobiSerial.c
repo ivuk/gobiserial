@@ -402,7 +402,9 @@ int GobiOpen(
    }
 
    // Is this the GPS port?
-   if (pPort->serial->interface->cur_altsetting->desc.bInterfaceNumber == 3)
+   if ( (pPort->serial->interface->cur_altsetting->desc.bInterfaceNumber == 3)
+   ||   (pPort->serial->interface->cur_altsetting->desc.bInterfaceNumber == 8)
+   ||   (pPort->serial->interface->cur_altsetting->desc.bInterfaceNumber == 9) )
    {
       // Send startMessage, 1s timeout
       nResult = usb_bulk_msg( pPort->serial->dev,
@@ -479,7 +481,9 @@ void GobiClose( struct usb_serial_port * pPort )
    }
 
    // Is this the GPS port?
-   if (pPort->serial->interface->cur_altsetting->desc.bInterfaceNumber == 3)
+   if ( (pPort->serial->interface->cur_altsetting->desc.bInterfaceNumber == 3)
+   ||   (pPort->serial->interface->cur_altsetting->desc.bInterfaceNumber == 8)
+   ||   (pPort->serial->interface->cur_altsetting->desc.bInterfaceNumber == 9) )
    {
       // Send stopMessage, 1s timeout
       nResult = usb_bulk_msg( pPort->serial->dev,
