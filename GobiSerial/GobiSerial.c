@@ -285,7 +285,7 @@ static int GobiProbe(
    else
    {
       // Composite mode
-      if (nInterfaceNum == 2)
+      if (nInterfaceNum == 3)
       {
          DBG( "Modem port found\n" );
          nRetval = usb_set_interface( pSerial->dev,
@@ -296,7 +296,7 @@ static int GobiProbe(
             DBG( "Could not set interface, error %d\n", nRetval );
          }
       }
-      else if (nInterfaceNum == 3 || nInterfaceNum == 8 || nInterfaceNum == 0)
+      else if (nInterfaceNum == 2 || nInterfaceNum == 8 || nInterfaceNum == 0)
       {
          DBG( "GPS port found\n" );
          nRetval = usb_set_interface( pSerial->dev,
@@ -402,7 +402,7 @@ int GobiOpen(
    }
 
    // Is this the GPS port?
-   if ( (pPort->serial->interface->cur_altsetting->desc.bInterfaceNumber == 3)
+   if ( (pPort->serial->interface->cur_altsetting->desc.bInterfaceNumber == 2)
    ||   (pPort->serial->interface->cur_altsetting->desc.bInterfaceNumber == 8)
    ||   (pPort->serial->interface->cur_altsetting->desc.bInterfaceNumber == 0) )
    {
@@ -481,7 +481,7 @@ void GobiClose( struct usb_serial_port * pPort )
    }
 
    // Is this the GPS port?
-   if ( (pPort->serial->interface->cur_altsetting->desc.bInterfaceNumber == 3)
+   if ( (pPort->serial->interface->cur_altsetting->desc.bInterfaceNumber == 2)
    ||   (pPort->serial->interface->cur_altsetting->desc.bInterfaceNumber == 8)
    ||   (pPort->serial->interface->cur_altsetting->desc.bInterfaceNumber == 0) )
    {
