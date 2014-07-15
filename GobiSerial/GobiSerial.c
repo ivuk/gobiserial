@@ -149,6 +149,10 @@ int GobiResume( struct usb_interface * pIntf );
 
 #endif
 
+#define MDM9X15_DEVICE(vend, prod) \
+    USB_DEVICE(vend, prod), \
+    .driver_info = BIT(1) | BIT(8) | BIT(10) | BIT(11)
+
 /*=========================================================================*/
 // Qualcomm Gobi 3000 VID/PIDs
 /*=========================================================================*/
@@ -159,8 +163,8 @@ static struct usb_device_id GobiVIDPIDTable[] =
    { USB_DEVICE( 0x03f0, 0x371d ) },   // Gobi 3000 HP un2430 Device
    { USB_DEVICE( 0x1410, 0xa021 ) },   // Novatel Wireless E396 - Gobi VID/PID
    { USB_DEVICE( 0x1410, 0xa023 ) },   // Novatel Wireless E346 - Gobi VID/PID
-   { USB_DEVICE( 0x1199, 0x9051 ) },   // NetGear AirCard 340U
-   { USB_DEVICE( 0x1199, 0x9055 ) },   // NetGear Aircard 341U
+   { MDM9X15_DEVICE( 0x1199, 0x9051 ) },   // NetGear AirCard 340U
+   { MDM9X15_DEVICE( 0x1199, 0x9055 ) },   // NetGear Aircard 341U
    // Netgear AC341U IPT2 mode
    { USB_DEVICE(0x1199, 0x9057),
       .driver_info = BIT(0) | BIT(1) |BIT(5)| BIT(8) | BIT(10) | BIT(11)
