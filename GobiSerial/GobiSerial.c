@@ -52,6 +52,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION( 3,2,0 ))
 #include <linux/module.h>
 #endif
+#include <linux/slab.h>
 
 //---------------------------------------------------------------------------
 // Global veriable and defination
@@ -64,6 +65,11 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #define NUM_BULK_EPS         1
 #define MAX_BULK_EPS         6
+
+#define SET_CONTROL_LINE_STATE_REQUEST_TYPE         0x21
+#define SET_CONTROL_LINE_STATE_REQUEST              0x22
+#define CONTROL_DTR                                 0x01
+#define CONTROL_RTS                                 0x02
 
 // Debug flag
 static bool debug;
@@ -153,6 +159,28 @@ int GobiResume( struct usb_interface * pIntf );
     USB_DEVICE(vend, prod), \
     .driver_info = BIT(1) | BIT(8) | BIT(10) | BIT(11)
 
+#if ( (LINUX_VERSION_CODE >= KERNEL_VERSION( 3,4,34 )) || \
+             (LINUX_VERSION_CODE >= KERNEL_VERSION( 3,5,0 )) || \
+             (LINUX_VERSION_CODE >= KERNEL_VERSION( 3,7,10 )) || \
+             (LINUX_VERSION_CODE >= KERNEL_VERSION( 3,8,1) ) )
+/* workaround for upstream commit b2ca699076573c94fee9a73cb0d8645383b602a0 */
+#warning "Assuming disc_mutex is locked external to the module"
+static inline void Gobi_lock_disc_mutex(struct usb_serial *serial) {
+       WARN_ON(!mutex_is_locked(&serial->disc_mutex));
+}
+static inline void Gobi_unlock_disc_mutex(struct usb_serial *serial) {}
+#else
+/* use the legacy method of locking disc_mutex in this driver */
+#warning "Using legacy method of locking disc_mutex"
+static inline void Gobi_lock_disc_mutex(struct usb_serial *serial) {
+       WARN_ON(mutex_is_locked(&serial->disc_mutex));
+          mutex_lock(&serial->disc_mutex);
+}
+static inline void Gobi_unlock_disc_mutex(struct usb_serial *serial) {
+       mutex_unlock(&serial->disc_mutex);
+}
+#endif
+
 /*=========================================================================*/
 // Qualcomm Gobi 3000 VID/PIDs
 /*=========================================================================*/
@@ -172,6 +200,13 @@ static struct usb_device_id GobiVIDPIDTable[] =
    { }                               // Terminating entry
 };
 MODULE_DEVICE_TABLE( usb, GobiVIDPIDTable );
+
+/* per port private data */
+struct sierra_port_private {
+   /* Settings for the port */
+   int rts_state;    /* Handshaking pins (outputs) */
+   int dtr_state;
+};
 
 /*=========================================================================*/
 // Struct usb_serial_driver
@@ -193,6 +228,158 @@ static struct usb_driver GobiDriver =
 #endif
    .supports_autosuspend = true,
 };
+
+static int Gobi_calc_interface(struct usb_serial *serial)
+{
+   int interface;
+   struct usb_interface *p_interface;
+   struct usb_host_interface *p_host_interface;
+   dev_dbg(&serial->dev->dev, "%s\n", __func__);
+
+   /* Get the interface structure pointer from the serial struct */
+   p_interface = serial->interface;
+
+   /* Get a pointer to the host interface structure */
+   p_host_interface = p_interface->cur_altsetting;
+
+   /* read the interface descriptor for this active altsetting
+    * to find out the interface number we are on
+    */
+   interface = p_host_interface->desc.bInterfaceNumber;
+
+   return interface;
+}
+
+static int Gobi_send_setup(struct usb_serial_port *port)
+{
+   struct usb_serial *serial = port->serial;
+   struct sierra_port_private *portdata;
+   __u16 interface = 0;
+   int val = 0;
+   int retval;
+
+   dev_dbg(&port->dev, "%s\n", __func__);
+
+   portdata = usb_get_serial_port_data(port);
+
+   if (portdata->dtr_state)
+      val |= CONTROL_DTR;
+   if (portdata->rts_state)
+      val |= CONTROL_RTS;
+
+   /* obtain interface for usb control message below */
+   if (serial->num_ports == 1) {
+      interface = Gobi_calc_interface(serial);
+   }
+   else {
+      dev_err(&port->dev,
+            "flow control is not supported for %d serial port\n",
+            serial->num_ports);
+      return -ENODEV;
+   }
+
+   retval = usb_autopm_get_interface(serial->interface);
+   if (retval < 0)
+   {
+      return retval;
+   }
+
+   retval = usb_control_msg(serial->dev, usb_rcvctrlpipe(serial->dev, 0),
+         SET_CONTROL_LINE_STATE_REQUEST,
+         SET_CONTROL_LINE_STATE_REQUEST_TYPE,
+         val, interface, NULL, 0, USB_CTRL_SET_TIMEOUT);
+   usb_autopm_put_interface(serial->interface);
+
+   return retval;
+}
+
+static void Gobi_dtr_rts(struct usb_serial_port *port, int on)
+{
+   struct usb_serial *serial = port->serial;
+   struct sierra_port_private *portdata;
+
+   portdata = usb_get_serial_port_data(port);
+   portdata->rts_state = on;
+   portdata->dtr_state = on;
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION( 3,2,51 ))
+   Gobi_send_setup(port);
+#else
+   /* only send down the usb control message if enabled */
+   if (serial->dev) {
+      Gobi_lock_disc_mutex(serial);
+      if (!serial->disconnected)
+      {
+         Gobi_send_setup(port);
+      }
+      Gobi_unlock_disc_mutex(serial);
+   }
+#endif
+}
+
+static int Gobi_startup(struct usb_serial *serial)
+{
+   struct usb_serial_port *port = NULL;
+   struct sierra_port_private *portdata = NULL;
+   int i;
+
+   dev_dbg(&serial->dev->dev, "%s\n", __func__);
+
+   if (serial->num_ports) {
+      /* Note: One big piece of memory is allocated for all ports 
+       * private data in one shot. This memory is split into equal 
+       * pieces for each port. 
+       */
+      portdata = (struct sierra_port_private *)kzalloc
+         (sizeof(*portdata) * serial->num_ports, GFP_KERNEL);
+      if (!portdata) {
+         dev_dbg(&serial->dev->dev, "%s: No memory!\n", __func__);
+         return -ENOMEM;
+      }
+   }
+
+   /* Now setup per port private data */
+   for (i = 0; i < serial->num_ports; i++, portdata++) {
+      port = serial->port[i];
+
+      /* Set the port private data pointer */
+      usb_set_serial_port_data(port, portdata);
+   }
+
+   return 0;
+}
+
+static void Gobi_release(struct usb_serial *serial)
+{
+   int i;
+   struct usb_serial_port *port;
+   struct sierra_intf_private *intfdata = serial->private;
+
+   dev_dbg(&serial->dev->dev, "%s\n", __func__);
+
+   if (serial->num_ports > 0) {
+      port = serial->port[0];
+      if (port)
+      {
+         /* Note: The entire piece of memory that was allocated 
+          * in the startup routine can be released by passing
+          * a pointer to the beginning of the piece.
+          * This address corresponds to the address of the chunk
+          * that was given to port 0.
+          */
+         kfree(usb_get_serial_port_data(port));
+      }
+   }
+
+   for (i = 0; i < serial->num_ports; ++i) {
+      port = serial->port[i];
+      if (!port)
+      {
+         continue;
+      }
+      usb_set_serial_port_data(port, NULL);
+   }
+   kfree(intfdata);
+}
 
 /*=========================================================================*/
 // Struct usb_serial_driver
@@ -216,6 +403,9 @@ static struct usb_serial_driver gGobiDevice =
    .num_bulk_out        = 1,
    .read_bulk_callback  = GobiReadBulkCallback,
 #endif
+   .dtr_rts             = Gobi_dtr_rts,
+   .attach              = Gobi_startup,
+   .release             = Gobi_release,
 };
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION( 3,4,0 ))
