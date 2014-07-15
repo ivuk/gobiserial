@@ -66,7 +66,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #define MAX_BULK_EPS         6
 
 // Debug flag
-static int debug;
+static debug;
 
 // Global pointer to usb_serial_generic_close function
 // This function is not exported, which is why we have to use a pointer
@@ -161,6 +161,10 @@ static struct usb_device_id GobiVIDPIDTable[] =
    { USB_DEVICE( 0x1410, 0xa023 ) },   // Novatel Wireless E346 - Gobi VID/PID
    { USB_DEVICE( 0x1199, 0x9051 ) },   // NetGear AirCard 340U
    { USB_DEVICE( 0x1199, 0x9055 ) },   // NetGear Aircard 341U
+   // Netgear AC341U IPT2 mode
+   { USB_DEVICE(0x1199, 0x9057),
+      .driver_info = BIT(0) | BIT(1) |BIT(5)| BIT(8) | BIT(10) | BIT(11)
+   },
    { }                               // Terminating entry
 };
 MODULE_DEVICE_TABLE( usb, GobiVIDPIDTable );
