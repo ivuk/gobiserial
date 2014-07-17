@@ -284,19 +284,8 @@ static void Gobi_dtr_rts(struct usb_serial_port *port, int on)
    portdata = usb_get_serial_port_data(port);
    portdata->rts_state = on;
    portdata->dtr_state = on;
-//#if (LINUX_VERSION_CODE <= KERNEL_VERSION( 3,2,51 ))
+
    Gobi_send_setup(port);
-//#else
-   /* only send down the usb control message if enabled */
-/*   if (serial->dev) {
-      Gobi_lock_disc_mutex(serial);
-      if (!serial->disconnected)
-      {
-         Gobi_send_setup(port);
-      }
-      Gobi_unlock_disc_mutex(serial);
-   }
-#endif */
 }
 
 static int Gobi_startup(struct usb_serial *serial)
