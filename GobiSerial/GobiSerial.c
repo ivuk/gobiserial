@@ -273,7 +273,6 @@ static int Gobi_send_setup(struct usb_serial_port *port)
 
 static void Gobi_dtr_rts(struct usb_serial_port *port, int on)
 {
-   struct usb_serial *serial = port->serial;
    struct sierra_port_private *portdata;
 
    portdata = usb_get_serial_port_data(port);
