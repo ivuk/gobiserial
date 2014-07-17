@@ -163,23 +163,6 @@ int GobiResume( struct usb_interface * pIntf );
              (LINUX_VERSION_CODE >= KERNEL_VERSION( 3,5,0 )) || \
              (LINUX_VERSION_CODE >= KERNEL_VERSION( 3,7,10 )) || \
              (LINUX_VERSION_CODE >= KERNEL_VERSION( 3,8,1) ) )
-/* workaround for upstream commit b2ca699076573c94fee9a73cb0d8645383b602a0 */
-#warning "Assuming disc_mutex is locked external to the module"
-static inline void Gobi_lock_disc_mutex(struct usb_serial *serial) {
-       WARN_ON(!mutex_is_locked(&serial->disc_mutex));
-}
-static inline void Gobi_unlock_disc_mutex(struct usb_serial *serial) {}
-#else
-/* use the legacy method of locking disc_mutex in this driver */
-#warning "Using legacy method of locking disc_mutex"
-static inline void Gobi_lock_disc_mutex(struct usb_serial *serial) {
-       WARN_ON(mutex_is_locked(&serial->disc_mutex));
-          mutex_lock(&serial->disc_mutex);
-}
-static inline void Gobi_unlock_disc_mutex(struct usb_serial *serial) {
-       mutex_unlock(&serial->disc_mutex);
-}
-#endif
 
 /*=========================================================================*/
 // Qualcomm Gobi 3000 VID/PIDs
