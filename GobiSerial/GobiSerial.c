@@ -159,11 +159,6 @@ int GobiResume( struct usb_interface * pIntf );
     USB_DEVICE(vend, prod), \
     .driver_info = BIT(1) | BIT(8) | BIT(10) | BIT(11)
 
-#if ( (LINUX_VERSION_CODE >= KERNEL_VERSION( 3,4,34 )) || \
-             (LINUX_VERSION_CODE >= KERNEL_VERSION( 3,5,0 )) || \
-             (LINUX_VERSION_CODE >= KERNEL_VERSION( 3,7,10 )) || \
-             (LINUX_VERSION_CODE >= KERNEL_VERSION( 3,8,1) ) )
-
 /*=========================================================================*/
 // Qualcomm Gobi 3000 VID/PIDs
 /*=========================================================================*/
